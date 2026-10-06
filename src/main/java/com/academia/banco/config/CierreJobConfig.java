@@ -1,5 +1,6 @@
 package com.academia.banco.config;
 
+import com.academia.banco.batch.MovimientoProcessor;
 import com.academia.banco.model.Movimiento;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -65,7 +66,7 @@ public class CierreJobConfig {
                 .build();
     }
 
-    // Un Step de tipo Chunk: lee y escribe de 10 en 10. (El Procesador llega en la MP-3.)
+    // Un Step de tipo Chunk: lee, procesa y escribe de 10 en 10.
     @Bean
     public Step cargarMovimientosStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
                                       FlatFileItemReader<Movimiento> movimientoReader,
@@ -74,6 +75,7 @@ public class CierreJobConfig {
                 .<Movimiento, Movimiento>chunk(10)
                 .transactionManager(transactionManager)
                 .reader(movimientoReader)
+                .processor(new MovimientoProcessor())
                 .writer(movimientoWriter)
                 .build();
     }
