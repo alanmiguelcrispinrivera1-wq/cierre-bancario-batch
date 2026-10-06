@@ -1,0 +1,6 @@
+CREATE TABLE IF NOT EXISTS movimiento (
+    id     BIGINT AUTO_INCREMENT PRIMARY KEY,
+    cuenta VARCHAR(10)    NOT NULL,
+    tipo   VARCHAR(10)    NOT NULL,
+    monto  DECIMAL(12, 2) NOT NULL
+);
