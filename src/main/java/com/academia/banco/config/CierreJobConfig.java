@@ -21,6 +21,8 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.transaction.PlatformTransactionManager;
+import java.math.BigDecimal;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 @Configuration
 public class CierreJobConfig {
@@ -80,12 +82,29 @@ public class CierreJobConfig {
                 .build();
     }
 
+
+    // Tasklet: consulta la tabla y resume cuántos movimientos hay y cuánto suman.
+    @Bean
+    public Step resumenStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
+                            JdbcTemplate jdbcTemplate) {
+        return new StepBuilder("resumenStep", jobRepository)
+                .tasklet((contribution, chunkContext) -> {
+                    Long total = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM movimiento", Long.class);
+                    BigDecimal suma = jdbcTemplate.queryForObject(
+                            "SELECT COALESCE(SUM(monto), 0) FROM movimiento", BigDecimal.class);
+                    System.out.println(">>> Resumen: " + total + " movimientos en la tabla, suma de montos = " + suma);
+                    return RepeatStatus.FINISHED;
+                }, transactionManager)
+                .build();
+    }
+
     // El Job: primero revisa que llegó el archivo, después lo carga.
     @Bean
-    public Job cierreDelDiaJob(JobRepository jobRepository, Step verificarArchivoStep, Step cargarMovimientosStep) {
+    public Job cierreDelDiaJob(JobRepository jobRepository, Step verificarArchivoStep, Step cargarMovimientosStep, Step resumenStep) {
         return new JobBuilder("cierreDelDiaJob", jobRepository)
                 .start(verificarArchivoStep)
                 .next(cargarMovimientosStep)
+                .next(resumenStep)
                 .build();
     }
 }

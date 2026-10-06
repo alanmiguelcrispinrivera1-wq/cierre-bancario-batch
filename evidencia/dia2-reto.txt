@@ -1,0 +1,31 @@
+$ ./mvnw -q spring-boot:run -Dspring-boot.run.arguments="fecha=2026-10-21"
+
+  .   ____          _            __ _ _
+ /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+ \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+  '  |____| .__|_| |_|_| |_\__, | / / / /
+ =========|_|==============|___/=/_/_/_/
+
+ :: Spring Boot ::                (v4.1.1)
+
+2026-10-06T13:49:29.693-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] c.a.b.CierreBancarioBatchApplication     : Starting CierreBancarioBatchApplication using Java 17.0.20.1 with PID 166657 (/home/alanc/cierre-bancario-batch/target/classes started by alanc in /home/alanc/cierre-bancario-batch)
+2026-10-06T13:49:29.698-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] c.a.b.CierreBancarioBatchApplication     : No active profile set, falling back to 1 default profile: "default"
+2026-10-06T13:49:30.683-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Starting...
+2026-10-06T13:49:31.205-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] com.zaxxer.hikari.pool.HikariPool        : HikariPool-1 - Added connection com.mysql.cj.jdbc.ConnectionImpl@7add323c
+2026-10-06T13:49:31.208-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Start completed.
+2026-10-06T13:49:31.727-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] c.a.b.CierreBancarioBatchApplication     : Started CierreBancarioBatchApplication in 1.795 seconds (process running for 3.069)
+2026-10-06T13:49:31.732-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] o.s.b.b.a.JobLauncherApplicationRunner   : Running default command line with: [fecha=2026-10-21]
+2026-10-06T13:49:31.976-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=cierreDelDiaJob]] launched with the following parameters: [{JobParameter{name='fecha', value=2026-10-21, type=class java.lang.String, identifying=true}}]
+2026-10-06T13:49:32.059-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] o.s.batch.core.step.AbstractStep         : Executing step: [verificarArchivoStep]
+>>> Archivo del día: datos/movimientos-2026-10-21.csv (0 movimientos)
+2026-10-06T13:49:32.097-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] o.s.batch.core.step.AbstractStep         : Step: [verificarArchivoStep] executed in 50ms
+2026-10-06T13:49:32.199-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] o.s.batch.core.step.AbstractStep         : Executing step: [cargarMovimientosStep]
+2026-10-06T13:49:32.259-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] o.s.batch.core.step.AbstractStep         : Step: [cargarMovimientosStep] executed in 70ms
+2026-10-06T13:49:32.349-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] o.s.batch.core.step.AbstractStep         : Executing step: [resumenStep]
+>>> Resumen: 65 movimientos en la tabla, suma de montos = 50869.50
+2026-10-06T13:49:32.381-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] o.s.batch.core.step.AbstractStep         : Step: [resumenStep] executed in 42ms
+2026-10-06T13:49:32.453-06:00  INFO 166657 --- [cierre-bancario-batch] [           main] o.s.b.c.l.s.TaskExecutorJobLauncher      : Job: [SimpleJob: [name=cierreDelDiaJob]] completed with the following parameters: [{JobParameter{name='fecha', value=2026-10-21, type=class java.lang.String, identifying=true}}] and the following status: [COMPLETED] in 440ms
+2026-10-06T13:49:32.460-06:00  INFO 166657 --- [cierre-bancario-batch] [ionShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown initiated...
+2026-10-06T13:49:32.471-06:00  INFO 166657 --- [cierre-bancario-batch] [ionShutdownHook] com.zaxxer.hikari.HikariDataSource       : HikariPool-1 - Shutdown completed.
+Código de salida: 0
