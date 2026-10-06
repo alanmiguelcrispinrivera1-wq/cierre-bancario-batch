@@ -1,0 +1,39 @@
+== Instancias y ejecuciones del Job (BATCH_JOB_INSTANCE, BATCH_JOB_EXECUTION, BATCH_JOB_EXECUTION_PARAMS)
++-----------------+------------------+------------+-----------+-----------+
+| JOB_INSTANCE_ID | JOB_EXECUTION_ID | fecha      | STATUS    | EXIT_CODE |
++-----------------+------------------+------------+-----------+-----------+
+|               1 |                1 | 2026-09-28 | COMPLETED | COMPLETED |
+|               2 |                2 | 2026-09-29 | COMPLETED | COMPLETED |
+|               3 |                3 | 2026-09-30 | COMPLETED | COMPLETED |
+|               4 |                4 | 2026-12-25 | FAILED    | FAILED    |
+|               5 |                5 | 2026-09-27 | COMPLETED | COMPLETED |
+|               6 |                6 | 2026-10-01 | COMPLETED | COMPLETED |
+|               7 |                7 | 2026-10-02 | COMPLETED | COMPLETED |
+|               8 |                8 | 2026-10-03 | COMPLETED | COMPLETED |
++-----------------+------------------+------------+-----------+-----------+
+== Ejecuciones de cada step (BATCH_STEP_EXECUTION)
++------------------+------------+-----------------------+-----------+------------+--------------+-------------+------------+--------------+----------------+
+| JOB_EXECUTION_ID | fecha      | STEP_NAME             | STATUS    | READ_COUNT | FILTER_COUNT | WRITE_COUNT | SKIP_COUNT | COMMIT_COUNT | ROLLBACK_COUNT |
++------------------+------------+-----------------------+-----------+------------+--------------+-------------+------------+--------------+----------------+
+|                1 | 2026-09-28 | saludoStep            | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                2 | 2026-09-29 | saludoStep            | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                3 | 2026-09-30 | saludoStep            | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                3 | 2026-09-30 | verificarArchivoStep  | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                4 | 2026-12-25 | saludoStep            | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                4 | 2026-12-25 | verificarArchivoStep  | FAILED    |          0 |            0 |           0 |          0 |            0 |              1 |
+|                5 | 2026-09-27 | saludoStep            | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                5 | 2026-09-27 | verificarArchivoStep  | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                5 | 2026-09-27 | contarArchivosStep    | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                6 | 2026-10-01 | verificarArchivoStep  | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                6 | 2026-10-01 | cargarMovimientosStep | COMPLETED |         25 |            0 |          25 |          0 |            3 |              0 |
+|                7 | 2026-10-02 | verificarArchivoStep  | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                7 | 2026-10-02 | cargarMovimientosStep | COMPLETED |         20 |            0 |          20 |          0 |            2 |              0 |
+|                8 | 2026-10-03 | verificarArchivoStep  | COMPLETED |          0 |            0 |           0 |          0 |            1 |              0 |
+|                8 | 2026-10-03 | cargarMovimientosStep | COMPLETED |         20 |            0 |          20 |          0 |            3 |              0 |
++------------------+------------+-----------------------+-----------+------------+--------------+-------------+------------+--------------+----------------+
+== Por qué falló (la primera línea de EXIT_MESSAGE de cada step FAILED)
++------------------+----------------------+--------------------------------------------------------------------------------------------------+
+| JOB_EXECUTION_ID | STEP_NAME            | EXIT_MESSAGE                                                                                     |
++------------------+----------------------+--------------------------------------------------------------------------------------------------+
+|                4 | verificarArchivoStep | java.lang.IllegalStateException: No existe el archivo del día: datos/movimientos-2026-12-25.csv  |
++------------------+----------------------+--------------------------------------------------------------------------------------------------+
