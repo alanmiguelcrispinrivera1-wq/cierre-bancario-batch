@@ -42,28 +42,12 @@ public class CierreJobConfig {
                 .build();
     }
 
-    // Tercer Tasklet: cuenta cuántos archivos hay en la carpeta datos/.
+    // El Job: el contenedor de los steps. Primero el saludo, después la revisión del archivo.
     @Bean
-    public Step contarArchivosStep(JobRepository jobRepository) {
-        return new StepBuilder("contarArchivosStep", jobRepository)
-                .tasklet((contribution, chunkContext) -> {
-                    long archivos;
-                    try (var lista = Files.list(Path.of("datos"))) {   // el try cierra el listado al terminar
-                        archivos = lista.count();
-                    }
-                    System.out.println(">>> Archivos en datos/: " + archivos);
-                    return RepeatStatus.FINISHED;
-                })
-                .build();
-    }
-
-    // El Job: el contenedor de los steps. Primero el saludo, después la revisión del archivo y al final el conteo de archivos
-    @Bean
-    public Job cierreDelDiaJob(JobRepository jobRepository, Step saludoStep, Step verificarArchivoStep, Step contarArchivosStep) {
+    public Job cierreDelDiaJob(JobRepository jobRepository, Step saludoStep, Step verificarArchivoStep) {
         return new JobBuilder("cierreDelDiaJob", jobRepository)
                 .start(saludoStep)
                 .next(verificarArchivoStep)
-                .next(contarArchivosStep)
                 .build();
     }
 }
