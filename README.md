@@ -50,6 +50,7 @@ Un step de tipo chunk está pensado para procesar muchos registros. Lee los elem
 - Lector (ItemReader): obtiene los datos de la fuente, un elemento a la vez. En mi caso, movimientoReader es un FlatFileItemReader que lee el CSV de la fecha, se salta el encabezado y convierte cada renglón en un Movimiento.
 - Procesador (ItemProcessor): recibe un elemento ya leído y lo transforma o valida antes de escribirlo. MovimientoProcessor limpia el tipo con trim().toUpperCase() y le quita los espacios a la cuenta. Si devolviera null, el elemento se descartaría y se sumaría a FILTER_COUNT.
 - Escritor (ItemWriter): guarda el bloque completo en el destino. movimientoWriter es un JdbcBatchItemWriter que hace el INSERT en la tabla movimiento de MySQL.
+
 El Procesador es el opcional. Sin él, lo que lee el Lector pasa directo al Escritor. El Lector y el Escritor siempre son obligatorios.
 
 3. Con 45 movimientos y chunks de 10, ¿cuántos commits habría? ¿Y con chunks de 50?
