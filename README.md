@@ -35,3 +35,31 @@ Para proteger la integridad de los datos. La instancia del 2026-09-28 ya termin�
 5. (MP-4, paso 6) Si mañana llega el archivo del 25 y corres otra vez el cierre del 25, ¿será otra instancia u otra ejecución de la misma? ¿Por qué lo crees?
 
 Sería una nueva ejecución dentro de la misma instancia. El intento anterior con fecha 2026-09-25 terminó en FAILED, por lo que esa JobInstance sigue sin completarse. Al relanzar el job con el mismo parámetro de fecha, Spring Batch no crea una instancia nueva: retoma la que ya existe y agrega un registro más en BATCH_JOB_EXECUTION que representa este nuevo intento.
+
+## Día 2 · El primer chunk
+
+### Boleto de salida
+
+1. ¿Qué diferencia hay entre un step de tipo Tasklet y uno de tipo chunk?
+
+Un Tasklet ejecuta una sola tarea completa en una única llamada y termina al devolver RepeatStatus.FINISHED. En mi proyecto, verificarArchivoStep es de este tipo: revisa que exista el archivo de la fecha y cuenta sus renglones, pero no procesa los movimientos uno por uno. Por eso en BATCH_STEP_EXECUTION aparece con READ_COUNT y WRITE_COUNT en 0 y un solo commit.
+Un step de tipo chunk está pensado para procesar muchos registros. Lee los elementos uno por uno, los procesa, los junta en bloques de un tamaño fijo y escribe y confirma (commit) cada bloque por separado. cargarMovimientosStep funciona así con chunk(10): con el archivo del 2026-10-01 registró READ_COUNT 25, WRITE_COUNT 25 y COMMIT_COUNT 3. En resumen, el Tasklet sirve para acciones puntuales y el chunk para cargar o transformar volúmenes de datos.
+
+2. ¿Qué hace cada una de las tres piezas de un chunk? ¿Cuál es opcional?
+
+- Lector (ItemReader): obtiene los datos de la fuente, un elemento a la vez. En mi caso, movimientoReader es un FlatFileItemReader que lee el CSV de la fecha, se salta el encabezado y convierte cada renglón en un Movimiento.
+- Procesador (ItemProcessor): recibe un elemento ya leído y lo transforma o valida antes de escribirlo. MovimientoProcessor limpia el tipo con trim().toUpperCase() y le quita los espacios a la cuenta. Si devolviera null, el elemento se descartaría y se sumaría a FILTER_COUNT.
+- Escritor (ItemWriter): guarda el bloque completo en el destino. movimientoWriter es un JdbcBatchItemWriter que hace el INSERT en la tabla movimiento de MySQL.
+El Procesador es el opcional. Sin él, lo que lee el Lector pasa directo al Escritor. El Lector y el Escritor siempre son obligatorios.
+
+3. Con 45 movimientos y chunks de 10, ¿cuántos commits habría? ¿Y con chunks de 50?
+
+Con chunks de 10 habría 5 commits: cuatro bloques llenos de 10 movimientos y un último bloque con los 5 restantes. Es decir, 45 / 10 redondeado hacia arriba. Mis tablas confirman esta regla: con chunk de 10, el archivo del 01 (25 movimientos) dio 3 commits y el del 02 (20 movimientos) dio 2. Con chunk de 7, el archivo del 03 (20 movimientos) dio 3 commits, en bloques de 7, 7 y 6. Con chunks de 50 habría 1 solo commit, porque los 45 movimientos caben en un bloque. La desventaja es que, si algo fallara, se haría rollback de los 45 y no solo de un bloque de 10.
+
+4. ¿Por qué el Escritor recibe el chunk completo y no un movimiento a la vez?
+
+Por eficiencia y por la transacción. El JdbcBatchItemWriter manda todos los INSERT del bloque a MySQL como un solo batch de JDBC, en un viaje a la base de datos, en lugar de hacer un viaje por cada movimiento. Con miles de registros, esa diferencia de rendimiento es muy grande. Además, el chunk es la unidad de transacción: los 10 movimientos se escriben y se confirman juntos en un mismo commit. Si uno falla, se hace rollback del bloque completo y la tabla no queda con un bloque guardado a medias. El Lector y el Procesador sí trabajan de uno en uno. La escritura se agrupa porque es la operación costosa y la que necesita ser atómica.
+
+5. Mi predicción de la MP-3, paso 1: ¿qué habría pasado sin el Procesador?
+
+El Job no habría fallado: habría terminado en COMPLETED y escrito los 20 movimientos del 2026-10-02. El problema es que se habrían guardado tal como vienen en el archivo, porque ese archivo trae el tipo escrito de varias formas: deposito, deposito (con espacio al inicio), Deposito, Retiro, RETIRO, etc. Todas caben en el VARCHAR(10) de la columna, así que MySQL no habría dado ningún error y los datos sucios habrían entrado sin aviso. La consecuencia se nota al consultar. Con el Procesador, el resumen por tipo (dia2-movimientos-2.txt) muestra solo dos grupos limpios: DEPOSITO con 25 y RETIRO con 20. Sin él, el GROUP BY tipo habría mostrado grupos extra, por ejemplo uno para deposito y otro para RETIRO, y los totales por tipo quedarían repartidos y no cuadrarían. Cualquier paso posterior que buscara exactamente 'RETIRO', como un cálculo de comisiones, se habría saltado esos movimientos. Por eso el Procesador es el lugar para normalizar los datos antes de escribirlos.
