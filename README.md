@@ -71,19 +71,28 @@ El Job no habría fallado: habría terminado en COMPLETED y escrito los 20 movim
 
 1. ¿Qué diferencia hay entre una JobInstance y una JobExecution? Usa como ejemplo el cierre del 25.
 
-
+La JobInstance es el trabajo lógico: el Job cierreDelDiaJob con un juego concreto de parámetros, en este caso fecha=2026-12-25. Existe una sola por fecha y representa el cierre que hay que completar. La JobExecution es cada intento de correr esa instancia.
+En mis tablas, el cierre del 25 tiene una sola JobInstance (la 4) y dos JobExecution:
+Ejecución 4 → FAILED. El archivo todavía no existía y verificarArchivoStep lanzó IllegalStateException: No existe el archivo del día.
+Ejecución 10 → COMPLETED. Cuando llegó el archivo, volví a correr la misma fecha. cargarMovimientosStep leyó y escribió los 5 movimientos.
+Fueron dos intentos, pero ambos pertenecen al mismo cierre: la instancia 4.
 
 2. ¿En qué caso Spring Batch se niega a correr un cierre, y en qué caso lo reinicia?
 
-
+Se niega cuando la JobInstance de esa fecha ya terminó en COMPLETED. Ese cierre ya está hecho, y volver a correrlo duplicaría los movimientos en la tabla. Por eso lanza JobInstanceAlreadyCompleteException, como pasó en el día 1 al repetir el cierre del 28. También rechaza el lanzamiento si esa misma instancia está corriendo en ese momento.
+Lo reinicia cuando la última ejecución de esa fecha terminó en FAILED (o STOPPED). En ese caso no crea una instancia nueva: agrega una JobExecution más a la existente y continúa desde el step que falló. Los steps que ya estaban en COMPLETED no se repiten. Se ve en el cierre del 05: en el reinicio (ejecución 13) ya no aparece verificarArchivoStep, solo cargarMovimientosStep. Por la misma regla, el 31 de diciembre pude intentarlo tres veces (ejecuciones 14, 15 y 16): las tres fallaron y todas quedaron en la misma instancia 12.
 
 3. En el reinicio del día 5, ¿por qué el step de carga leyó 10 movimientos y no 20?
 
-
+Porque Spring Batch reanudó la lectura donde se había quedado. En la primera ejecución (la 12), el primer chunk de 10 movimientos se escribió y se confirmó (COMMIT_COUNT 1). El segundo chunk falló en el renglón 2001,DEPOSITO,mil, porque "mil" no se puede convertir a BigDecimal, y se hizo rollback (ROLLBACK_COUNT 1). En ese momento la tabla quedó con 10 filas.
+En cada commit, Spring Batch guarda en el ExecutionContext del step cuántos elementos llevaba leídos el Lector. Al reiniciar con el archivo corregido (ejecución 13), el FlatFileItemReader usó ese dato, se saltó los 10 que ya estaban guardados y solo leyó y escribió los 10 restantes. Por eso la tabla terminó con 20 filas y no con 30: no se duplicó nada.
 
 4. ¿Qué diferencia hay entre un movimiento **filtrado** y uno **omitido**?
 
-
+- Filtrado: el renglón se leyó bien, pero el Procesador decidió que no debía escribirse y devolvió null. Es una regla de negocio. En mi caso descarta cualquier tipo que no sea DEPOSITO o RETIRO, como TRANSFERENCIA, PAGO o un tipo vacío. No es un error, no tiene límite y cuenta en FILTER_COUNT. El cierre del 04 lo muestra: leyó 20, filtró 2 y escribió 18.
+- Omitido (skip): el renglón ni siquiera se pudo leer. El Lector lanzó una FlatFileParseException, por ejemplo con 3004,RETIRO,diez o con 3002;DEPOSITO;5.00, que usa punto y coma. Es un error que la política faultTolerant().skip(...) permite ignorar, pero con un tope: skipLimit(3). Cuenta en SKIP_COUNT.
 
 5. ¿Por qué importa el código de salida, si el estado ya queda en las tablas?
 
+Porque quien lanza el cierre normalmente no es una persona revisando MySQL, sino otro programa: un cron, un orquestador como Control-M o un pipeline. Ese programa no consulta BATCH_JOB_EXECUTION. Lo único que ve de inmediato es el número con el que terminó el proceso, y con eso decide si continúa con el siguiente proceso, si manda una alerta o si reintenta.
+Mi evidencia muestra el problema. Antes del cambio en main (dia3-salida-antes), el cierre del 31 terminó en FAILED en las tablas, pero el programa salió con código 0. Para cualquier script, eso significa "todo bien", así que la falla habría pasado sin que nadie se enterara. Con System.exit(SpringApplication.exit(...)), el estado del Job se traduce a un código distinto de 0: el JAR sale con 5 (dia3-salida-jar), y a través de ./mvnw, Maven lo reporta como 1 (dia3-salida-despues). Las tablas sirven para investigar después qué pasó. El código de salida sirve para reaccionar en el momento.
