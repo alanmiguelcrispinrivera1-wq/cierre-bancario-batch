@@ -14,6 +14,7 @@ import org.springframework.batch.core.step.builder.StepBuilder;
 import org.springframework.batch.infrastructure.item.database.JdbcBatchItemWriter;
 import org.springframework.batch.infrastructure.item.database.builder.JdbcBatchItemWriterBuilder;
 import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
+import org.springframework.batch.infrastructure.item.file.FlatFileParseException;
 import org.springframework.batch.infrastructure.item.file.builder.FlatFileItemReaderBuilder;
 import org.springframework.batch.infrastructure.repeat.RepeatStatus;
 import org.springframework.beans.factory.annotation.Value;
@@ -66,7 +67,7 @@ public class CierreJobConfig {
                 .build();
     }
 
-    // Un Step de tipo Chunk: lee, procesa y escribe de 10 en 10.
+    // Un Step de tipo Chunk: lee, procesa y escribe de 10 en 10, omitiendo los renglones que no se pueden leer.
     @Bean
     public Step cargarMovimientosStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
                                       FlatFileItemReader<Movimiento> movimientoReader,
@@ -77,6 +78,9 @@ public class CierreJobConfig {
                 .reader(movimientoReader)
                 .processor(new MovimientoProcessor())
                 .writer(movimientoWriter)
+                .faultTolerant()                             // tolerante a fallas:
+                .skip(FlatFileParseException.class)          // si un renglón no se puede leer, se OMITE…
+                .skipLimit(3)                                // …hasta 3 por ejecución; el 4.º hace fallar el step
                 .build();
     }
 
