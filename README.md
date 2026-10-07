@@ -64,3 +64,26 @@ Por eficiencia y por la transacción. El JdbcBatchItemWriter manda todos los INS
 5. Mi predicción de la MP-3, paso 1: ¿qué habría pasado sin el Procesador?
 
 El Job no habría fallado: habría terminado en COMPLETED y escrito los 20 movimientos del 2026-10-02. El problema es que se habrían guardado tal como vienen en el archivo, porque ese archivo trae el tipo escrito de varias formas: deposito, deposito (con espacio al inicio), Deposito, Retiro, RETIRO, etc. Todas caben en el VARCHAR(10) de la columna, así que MySQL no habría dado ningún error y los datos sucios habrían entrado sin aviso. La consecuencia se nota al consultar. Con el Procesador, el resumen por tipo (dia2-movimientos-2.txt) muestra solo dos grupos limpios: DEPOSITO con 25 y RETIRO con 20. Sin él, el GROUP BY tipo habría mostrado grupos extra, por ejemplo uno para deposito y otro para RETIRO, y los totales por tipo quedarían repartidos y no cuadrarían. Cualquier paso posterior que buscara exactamente 'RETIRO', como un cálculo de comisiones, se habría saltado esos movimientos. Por eso el Procesador es el lugar para normalizar los datos antes de escribirlos.
+
+## Día 3 · Parámetros, fallas y reinicio
+
+### Boleto de salida
+
+1. ¿Qué diferencia hay entre una JobInstance y una JobExecution? Usa como ejemplo el cierre del 25.
+
+
+
+2. ¿En qué caso Spring Batch se niega a correr un cierre, y en qué caso lo reinicia?
+
+
+
+3. En el reinicio del día 5, ¿por qué el step de carga leyó 10 movimientos y no 20?
+
+
+
+4. ¿Qué diferencia hay entre un movimiento **filtrado** y uno **omitido**?
+
+
+
+5. ¿Por qué importa el código de salida, si el estado ya queda en las tablas?
+
