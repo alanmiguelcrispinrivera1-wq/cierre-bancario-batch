@@ -2,6 +2,7 @@ package com.academia.banco.config;
 
 import com.academia.banco.batch.MovimientoProcessor;
 import com.academia.banco.model.Movimiento;
+import com.academia.banco.model.SaldoCuenta;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.sql.DataSource;
@@ -11,8 +12,12 @@ import org.springframework.batch.core.job.builder.JobBuilder;
 import org.springframework.batch.core.repository.JobRepository;
 import org.springframework.batch.core.step.Step;
 import org.springframework.batch.core.step.builder.StepBuilder;
+import org.springframework.batch.infrastructure.item.data.MongoItemWriter;
+import org.springframework.batch.infrastructure.item.data.builder.MongoItemWriterBuilder;
 import org.springframework.batch.infrastructure.item.database.JdbcBatchItemWriter;
+import org.springframework.batch.infrastructure.item.database.JdbcCursorItemReader;
 import org.springframework.batch.infrastructure.item.database.builder.JdbcBatchItemWriterBuilder;
+import org.springframework.batch.infrastructure.item.database.builder.JdbcCursorItemReaderBuilder;
 import org.springframework.batch.infrastructure.item.file.FlatFileItemReader;
 import org.springframework.batch.infrastructure.item.file.FlatFileParseException;
 import org.springframework.batch.infrastructure.item.file.builder.FlatFileItemReaderBuilder;
@@ -21,6 +26,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.transaction.PlatformTransactionManager;
 
 @Configuration
@@ -84,12 +90,55 @@ public class CierreJobConfig {
                 .build();
     }
 
-    // El Job: primero revisa que llegó el archivo, después lo carga.
+    // ── Step 3: de MySQL a MongoDB ─────────────────────────────────────────────────────────────────────────────
+
+    // El Lector: una consulta a MySQL que ya trae el saldo de cada cuenta (depósitos − retiros) y cuántos movimientos tiene.
     @Bean
-    public Job cierreDelDiaJob(JobRepository jobRepository, Step verificarArchivoStep, Step cargarMovimientosStep) {
+    public JdbcCursorItemReader<SaldoCuenta> saldoReader(DataSource dataSource) {
+        return new JdbcCursorItemReaderBuilder<SaldoCuenta>()
+                .name("saldoReader")
+                .dataSource(dataSource)
+                .sql("""
+                        SELECT cuenta,
+                               SUM(CASE WHEN tipo = 'DEPOSITO' THEN monto ELSE -monto END) AS saldo,
+                               COUNT(*) AS movimientos
+                        FROM movimiento
+                        GROUP BY cuenta
+                        ORDER BY cuenta""")
+                .dataRowMapper(SaldoCuenta.class)        // cada renglón → un SaldoCuenta (columnas = componentes del record)
+                .build();
+    }
+
+    // El Escritor: guarda cada SaldoCuenta en la colección «saldos». Si ya existe uno con ese _id, lo reemplaza.
+    @Bean
+    public MongoItemWriter<SaldoCuenta> saldoWriter(MongoTemplate mongoTemplate) {
+        return new MongoItemWriterBuilder<SaldoCuenta>()
+                .template(mongoTemplate)
+                .collection("saldos")
+                .build();
+    }
+
+    // Un Step de tipo Chunk, sin Procesador: lee de MySQL y escribe en MongoDB, de 3 en 3.
+    @Bean
+    public Step publicarSaldosStep(JobRepository jobRepository, PlatformTransactionManager transactionManager,
+                                   JdbcCursorItemReader<SaldoCuenta> saldoReader,
+                                   MongoItemWriter<SaldoCuenta> saldoWriter) {
+        return new StepBuilder("publicarSaldosStep", jobRepository)
+                .<SaldoCuenta, SaldoCuenta>chunk(3)
+                .transactionManager(transactionManager)
+                .reader(saldoReader)
+                .writer(saldoWriter)
+                .build();
+    }
+
+    // El Job: revisa el archivo, lo carga en MySQL y publica los saldos en MongoDB.
+    @Bean
+    public Job cierreDelDiaJob(JobRepository jobRepository, Step verificarArchivoStep, Step cargarMovimientosStep,
+                               Step publicarSaldosStep) {
         return new JobBuilder("cierreDelDiaJob", jobRepository)
                 .start(verificarArchivoStep)
                 .next(cargarMovimientosStep)
+                .next(publicarSaldosStep)
                 .build();
     }
 }
