@@ -96,3 +96,35 @@ En cada commit, Spring Batch guarda en el ExecutionContext del step cuántos ele
 
 Porque quien lanza el cierre normalmente no es una persona revisando MySQL, sino otro programa: un cron, un orquestador como Control-M o un pipeline. Ese programa no consulta BATCH_JOB_EXECUTION. Lo único que ve de inmediato es el número con el que terminó el proceso, y con eso decide si continúa con el siguiente proceso, si manda una alerta o si reintenta.
 Mi evidencia muestra el problema. Antes del cambio en main (dia3-salida-antes), el cierre del 31 terminó en FAILED en las tablas, pero el programa salió con código 0. Para cualquier script, eso significa "todo bien", así que la falla habría pasado sin que nadie se enterara. Con System.exit(SpringApplication.exit(...)), el estado del Job se traduce a un código distinto de 0: el JAR sale con 5 (dia3-salida-jar), y a través de ./mvnw, Maven lo reporta como 1 (dia3-salida-despues). Las tablas sirven para investigar después qué pasó. El código de salida sirve para reaccionar en el momento.
+
+## Día 4 · De MySQL a MongoDB
+
+### Boleto de salida
+
+1. ¿Qué hace cada uno de los tres steps de tu Job, y de qué tipo es cada uno?
+
+
+
+2. ¿Por qué el cierre del 9 no duplicó los saldos, y el del 10 (sin `@Id`) sí?
+
+
+
+3. Al reiniciar el cierre del 11, ¿por qué no se cargó otra vez el archivo?
+
+
+
+4. ¿Qué diferencia hay entre `spring-boot-starter-data-mongodb` y «Spring Batch MongoDB» (`batch-data-mongodb`)?
+
+
+
+
+## Lo que aprendí esta semana
+
+(Con tus palabras, en 5 a 10 renglones: qué es un proceso batch, qué piezas tiene un Job y qué hace Spring
+Batch cuando algo falla.)
+
+- ¿Que es un proceso batch?
+
+- ¿Que piezas tiene un job?
+
+- ¿Que hace Spring cuando algo falla?
