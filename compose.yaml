@@ -18,5 +18,22 @@ services:
       timeout: 3s
       retries: 30
 
+  mongo:
+    image: mongo:8.2                  # fija: 8.3 y 8.0 NO arrancan con kernels de Linux 6.19 o más nuevos
+    container_name: banco-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: academia
+      MONGO_INITDB_ROOT_PASSWORD: academia123
+    ports:
+      - "27017:27017"
+    volumes:
+      - banco-mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "-u", "academia", "-p", "academia123", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
 volumes:
   banco-mysql-data:
+  banco-mongo-data:
