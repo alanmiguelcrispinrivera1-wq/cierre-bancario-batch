@@ -1,0 +1,8 @@
+[
+  { _id: '1002', saldo: Decimal128('-76.00') },
+  { _id: '1005', saldo: Decimal128('-674.50') },
+  { _id: '2001', saldo: Decimal128('-250.00') },
+  { _id: '2003', saldo: Decimal128('-5100.00') },
+  { _id: '2005', saldo: Decimal128('-1400.00') },
+  { _id: '3004', saldo: Decimal128('-540.00') }
+]

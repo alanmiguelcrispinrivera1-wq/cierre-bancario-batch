@@ -3,6 +3,7 @@ package com.academia.banco.config;
 import com.academia.banco.batch.MovimientoProcessor;
 import com.academia.banco.model.Movimiento;
 import com.academia.banco.model.SaldoCuenta;
+import com.academia.banco.batch.SaldoPositivoProcessor;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import javax.sql.DataSource;
@@ -127,6 +128,7 @@ public class CierreJobConfig {
                 .<SaldoCuenta, SaldoCuenta>chunk(3)
                 .transactionManager(transactionManager)
                 .reader(saldoReader)
+                .processor(new SaldoPositivoProcessor())
                 .writer(saldoWriter)
                 .build();
     }
