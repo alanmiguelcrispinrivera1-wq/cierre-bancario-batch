@@ -103,20 +103,26 @@ Mi evidencia muestra el problema. Antes del cambio en main (dia3-salida-antes), 
 
 1. ¿Qué hace cada uno de los tres steps de tu Job, y de qué tipo es cada uno?
 
-
+- verificarArchivoStep (Tasklet): revisa que exista el archivo datos/movimientos-<fecha>.csv de la fecha que recibe el Job y cuenta cuántos movimientos trae. Si no existe, lanza una excepción y el Job falla ahí mismo. Es una sola tarea que se ejecuta una vez.
+- cargarMovimientosStep (Chunk de 10): lee el CSV renglón por renglón con un FlatFileItemReader. El MovimientoProcessor filtra los movimientos inválidos y el JdbcBatchItemWriter los inserta en la tabla movimiento de MySQL. Es tolerante a fallas: omite hasta 3 renglones ilegibles.
+- publicarSaldosStep (Chunk de 3, sin procesador): con un JdbcCursorItemReader hace una consulta a MySQL que calcula el saldo de cada cuenta (depósitos menos retiros) y cuántos movimientos tiene. Luego un MongoItemWriter guarda cada SaldoCuenta en la colección saldos de MongoDB.
 
 2. ¿Por qué el cierre del 9 no duplicó los saldos, y el del 10 (sin `@Id`) sí?
 
+En el cierre del 9, SaldoCuenta tenía @Id en el campo cuenta, así que el número de cuenta era el _id del documento. Como el MongoItemWriter guarda con save, si ya existe un documento con ese _id lo reemplaza en lugar de crear otro. Por eso quedaron 15 documentos, uno por cuenta, con el saldo actualizado.
+
+En el cierre del 10 quité el @Id, y Mongo ya no tenía con qué identificar cada documento. A cada uno le generó un ObjectId nuevo y los insertó como documentos distintos. Por eso la colección pasó a 30 documentos y la cuenta 1001 apareció dos veces: una con _id: '1001' y otra con un ObjectId y el campo cuenta: '1001'.
 
 
 3. Al reiniciar el cierre del 11, ¿por qué no se cargó otra vez el archivo?
 
-
+Al volver a correr con fecha=2026-10-11, Spring Batch reconoció que era la misma JobInstance (la 19), que había quedado en FAILED, así que creó una nueva ejecución (la 24) para esa misma instancia. Antes de correr cada step consultó en el JobRepository cómo había terminado en la ejecución anterior. verificarArchivoStep y cargarMovimientosStep habían terminado en COMPLETED, así que se los saltó. Solo volvió a ejecutar publicarSaldosStep, que era el que había fallado por el SQL roto (Failed to initialize the reader). Lo comprobé con el conteo de la tabla movimiento: antes había 182 registros, después de la falla 197 (se cargaron los 15 del día 11) y después del reinicio seguían siendo 197. No se duplicó nada.
 
 4. ¿Qué diferencia hay entre `spring-boot-starter-data-mongodb` y «Spring Batch MongoDB» (`batch-data-mongodb`)?
 
-
-
+- spring-boot-starter-data-mongodb conecta mi aplicación con MongoDB: trae el driver, configura el MongoTemplate y Spring Data MongoDB (@Document, @Id, repositorios). Es lo que uso para escribir mis datos de negocio, los saldos, en la colección saldos.
+- Spring Batch MongoDB (batch-data-mongodb) sirve para que Spring Batch guarde sus propios metadatos en MongoDB, es decir, el JobRepository: instancias, ejecuciones, estados y conteos de cada step. Sin él, esos metadatos se guardan en las tablas BATCH_*.
+En mi proyecto solo tengo el primero. Mis saldos van a MongoDB, pero el registro de las ejecuciones del Job sigue en las tablas BATCH_* de MySQL.
 
 ## Lo que aprendí esta semana
 
@@ -125,6 +131,12 @@ Batch cuando algo falla.)
 
 - ¿Que es un proceso batch?
 
+Es un proceso que trabaja con un volumen grande de datos de una sola vez, sin que nadie interactúe con él mientras corre, normalmente programado (como el cierre bancario de cada día). Lee datos de una fuente, los transforma o valida y los guarda en otra.
+
 - ¿Que piezas tiene un job?
 
+Un Job está formado por uno o varios Steps que se ejecutan en orden. Un Step puede ser de tipo Tasklet (una tarea única) o de tipo Chunk, que tiene un Lector (ItemReader), un Procesador opcional (ItemProcessor) y un Escritor (ItemWriter), y trabaja en bloques de N registros, cada bloque en su propia transacción. Cada vez que el Job corre con ciertos parámetros (la fecha) se crea una JobInstance. Cada intento de correrla es una JobExecution. Todo eso queda registrado en el JobRepository.
+
 - ¿Que hace Spring cuando algo falla?
+
+Si un chunk falla, hace rollback solo de ese bloque, y los chunks anteriores ya quedaron guardados. El Job queda en FAILED y la falla queda registrada en el JobRepository. Cuando lo vuelvo a correr con los mismos parámetros, reinicia la misma JobInstance: se salta los steps que ya terminaron y continúa desde donde se quedó, sin duplicar datos. También puedo configurarlo como tolerante a fallas (faultTolerant + skip + skipLimit) para que omita registros malos hasta un límite, y la aplicación devuelve un código de salida distinto de 0 cuando el Job falla.
